@@ -104,7 +104,10 @@ if current is None:
         employee for employee in EMPLOYEES if employee["id"] not in registered_ids
     ]
     available_employees.sort(
-        key=lambda employee: employee_label(employee).casefold()
+        key=lambda employee: (
+            employee["first_name"].casefold(),
+            employee["last_name"].casefold(),
+        )
     )
     choices = {employee_label(item): item for item in available_employees}
     if not choices:
