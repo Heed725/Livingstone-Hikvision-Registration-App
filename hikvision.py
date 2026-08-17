@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 import requests
+from PIL import Image, ImageOps
 from requests.auth import HTTPDigestAuth
 from requests.exceptions import RequestException
 
@@ -52,6 +54,8 @@ class HikvisionClient:
         self.session = requests.Session()
         self.session.auth = HTTPDigestAuth(username, password)
         self.session.headers["User-Agent"] = "Livingstone-Registration/1.0"
+        # Hikvision embedded web servers are more reliable without persistent connections.
+        self.session.headers["Connection"] = "close"
 
     def request(self, method: str, path: str, **kwargs: Any) -> requests.Response:
         kwargs.setdefault("timeout", self.timeout)
@@ -104,25 +108,65 @@ class HikvisionClient:
         }
         return self.request("POST", "/ISAPI/AccessControl/UserInfo/Record?format=json", json=payload)
 
+    @staticmethod
+    def prepare_face_image(image: bytes) -> bytes:
+        """Convert phone photos to a Hikvision-friendly JPEG below 200 KB."""
+        try:
+            with Image.open(io.BytesIO(image)) as source:
+                prepared = ImageOps.exif_transpose(source).convert("RGB")
+                prepared.thumbnail((1080, 1080), Image.Resampling.LANCZOS)
+                for quality in (88, 80, 72, 64, 56, 48):
+                    output = io.BytesIO()
+                    prepared.save(output, format="JPEG", quality=quality, optimize=True)
+                    result = output.getvalue()
+                    if len(result) <= 200 * 1024:
+                        return result
+                return result
+        except (OSError, ValueError) as exc:
+            raise HikvisionError("The selected face photograph is not a readable JPEG image.") from exc
+
     def upload_face(self, employee_no: str, image: bytes, filename: str) -> requests.Response:
         metadata = {"faceLibType": "blackFD", "FDID": "1", "FPID": employee_no}
+        prepared_image = self.prepare_face_image(image)
         files = {
             "FaceDataRecord": (None, json.dumps(metadata), "application/json"),
-            "FaceImage": (filename, image, "image/jpeg"),
+            "FaceImage": ("face.jpg", prepared_image, "image/jpeg"),
         }
         return self.request("POST", "/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json", files=files)
 
-    def capture_fingerprint(self, finger_id: int) -> FingerprintCapture:
+    def capture_fingerprint(self, finger_id: int = 1) -> FingerprintCapture:
         response = self.request(
             "POST",
             "/ISAPI/AccessControl/CaptureFingerPrint?format=json",
-            json={"CaptureFingerPrint": {"fingerNo": finger_id}},
+            json={"CaptureFingerPrintCond": {"fingerNo": finger_id}},
             timeout=max(self.timeout, 60),
         )
+
+        if not response.ok and "badxml" in response_message(response).replace(" ", "").lower():
+            xml_payload = (
+                '<?xml version="1.0" encoding="UTF-8"?>'
+                '<CaptureFingerPrintCond version="2.0" '
+                'xmlns="http://www.isapi.org/ver20/XMLSchema">'
+                f"<fingerNo>{finger_id}</fingerNo>"
+                "</CaptureFingerPrintCond>"
+            )
+            response = self.request(
+                "POST",
+                "/ISAPI/AccessControl/CaptureFingerPrint",
+                data=xml_payload.encode("utf-8"),
+                headers={"Content-Type": "application/xml"},
+                timeout=max(self.timeout, 60),
+            )
+
         if not response.ok:
             return FingerprintCapture(None, message=response_message(response))
         try:
-            captured = response.json().get("CaptureFingerPrint", response.json())
+            body = response.json()
+            captured = (
+                body.get("CaptureFingerPrintResult")
+                or body.get("CaptureFingerPrint")
+                or body
+            )
             data = captured.get("fingerData") or captured.get("fingerPrintData")
             quality = captured.get("fingerPrintQuality") or captured.get("quality")
         except ValueError:
