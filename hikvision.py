@@ -89,6 +89,52 @@ class HikvisionClient:
         except ValueError as exc:
             raise HikvisionError("The device returned an unreadable employee-search response.") from exc
 
+    def registered_employee_ids(self, employee_ids: list[str]) -> set[str]:
+        """Return employees who already have at least one face or fingerprint."""
+        if not employee_ids:
+            return set()
+        payload = {
+            "UserInfoSearchCond": {
+                "searchID": "livingstone-registration-status",
+                "searchResultPosition": 0,
+                "maxResults": len(employee_ids),
+                "EmployeeNoList": [{"employeeNo": employee_id} for employee_id in employee_ids],
+            }
+        }
+        response = self.request(
+            "POST", "/ISAPI/AccessControl/UserInfo/Search?format=json", json=payload
+        )
+        if not response.ok:
+            raise HikvisionError(
+                f"Could not check registration status: {response_message(response)}"
+            )
+        try:
+            users = response.json().get("UserInfoSearch", {}).get("UserInfo", [])
+        except ValueError as exc:
+            raise HikvisionError(
+                "The device returned an unreadable registration-status response."
+            ) from exc
+        if isinstance(users, dict):
+            users = [users]
+
+        registered: set[str] = set()
+        count_fields = (
+            "numOfFace",
+            "numOfFP",
+            "numOfFingerPrint",
+            "faceNum",
+            "fingerPrintNum",
+        )
+        for user in users:
+            for field in count_fields:
+                try:
+                    if int(user.get(field, 0) or 0) > 0:
+                        registered.add(str(user.get("employeeNo", "")))
+                        break
+                except (TypeError, ValueError):
+                    continue
+        return registered
+
     def create_user(self, employee: dict) -> requests.Response:
         now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         payload = {
