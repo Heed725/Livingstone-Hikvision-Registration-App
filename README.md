@@ -51,7 +51,7 @@ The terminal should report support for these ISAPI capabilities:
 
 ## Enrollment flow
 
-1. Employee selects their ID and name.
+1. The app hides employees who already have a face or fingerprint on the terminal; an unregistered employee selects their ID and name.
 2. Employee enters the administrator-provided registration PIN.
 3. The app checks that the employee exists on the Hikvision terminal and creates the record if missing.
 4. For face enrollment, the employee uses the phone camera or uploads a clear JPEG.
