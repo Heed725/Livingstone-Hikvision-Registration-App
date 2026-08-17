@@ -103,6 +103,9 @@ if current is None:
     available_employees = [
         employee for employee in EMPLOYEES if employee["id"] not in registered_ids
     ]
+    available_employees.sort(
+        key=lambda employee: employee_label(employee).casefold()
+    )
     choices = {employee_label(item): item for item in available_employees}
     if not choices:
         st.success("All listed employees have already registered a face or fingerprint.")
