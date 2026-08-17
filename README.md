@@ -9,6 +9,7 @@ A mobile-friendly Streamlit application where an employee selects their own reco
 - The employee must confirm that they selected their own name.
 - Device credentials are stored only in Streamlit secrets.
 - Face images and fingerprint templates are not stored by this app.
+- Phone photographs are resized and compressed before being sent to the terminal.
 - Fingerprints are captured by the physical Hikvision terminal, not the phone.
 
 Run enrollment only under administrator supervision. Biometric information is sensitive personal data.
@@ -54,7 +55,7 @@ The terminal should report support for these ISAPI capabilities:
 2. Employee enters the administrator-provided registration PIN.
 3. The app checks that the employee exists on the Hikvision terminal and creates the record if missing.
 4. For face enrollment, the employee uses the phone camera or uploads a clear JPEG.
-5. For fingerprint enrollment, the employee stands at the physical terminal and touches its sensor after starting capture from the app.
+5. For fingerprint enrollment, the employee stands at the physical terminal and captures one finger in slot 1. Yellow indicates waiting; green confirms successful capture and registration.
 
 ## Important hosting limitation
 
