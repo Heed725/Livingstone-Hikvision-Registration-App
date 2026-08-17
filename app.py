@@ -91,7 +91,23 @@ current = verified_employee()
 
 if current is None:
     st.markdown('<h3><span class="step">1</span>Select and verify yourself</h3>', unsafe_allow_html=True)
-    choices = {employee_label(item): item for item in EMPLOYEES}
+    try:
+        available_device = device()
+        registered_ids = available_device.registered_employee_ids(
+            [employee["id"] for employee in EMPLOYEES]
+        )
+    except HikvisionError as exc:
+        st.error(str(exc))
+        st.stop()
+
+    available_employees = [
+        employee for employee in EMPLOYEES if employee["id"] not in registered_ids
+    ]
+    choices = {employee_label(item): item for item in available_employees}
+    if not choices:
+        st.success("All listed employees have already registered a face or fingerprint.")
+        st.stop()
+
     with st.form("identify", clear_on_submit=False):
         selected_label = st.selectbox(
             "Employee",
