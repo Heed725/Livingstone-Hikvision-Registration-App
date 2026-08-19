@@ -18,6 +18,7 @@ EMPLOYEES = [
     {"id": "1309", "first_name": "Ally", "last_name": "Omar Bahdela", "department": "All Departments/Bahdela HQ"},
     {"id": "1295", "first_name": "Ahmad", "last_name": "Said Kanza", "department": "All Departments/Bahdela HQ"},
     {"id": "1290", "first_name": "Adam", "last_name": "Obadia Mbena", "department": "All Departments/Bahdela HQ"},
+    {"id": "1390", "first_name": "Lutifiya", "last_name": "Jumanne Mtinangi", "department": "All Departments/Bahdela HQ"},
 ]
 
 
